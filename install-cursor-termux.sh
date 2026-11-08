@@ -11,7 +11,10 @@
 #   4. installs a Node preload that spoofs glibc detection and stubs native
 #      modules Cursor cannot dlopen on Android (file-service / merkle)
 #   5. best-effort patches Merkle failure path + rebuilds sqlite3 for Bionic
-#   6. installs a durable launcher in $PREFIX/bin so updates cannot hide it
+#   6. rebuilds tree-sitter / tree-sitter-bash (glibc addons crash on Bionic
+#      with libgcc_s.so.1 missing; node-gyp-build prefers build/Release)
+#   7. installs a durable launcher in $PREFIX/bin so updates cannot hide it
+#      (cursor-agent only — leaves $PREFIX/bin/agent for Grok)
 #
 # Usage:
 #   bash /sdcard/Download/install-cursor-termux.sh              # latest
@@ -104,7 +107,7 @@ ensure_cmd tar tar
 ensure_cmd python3 python
 
 # Node + ripgrep replace the glibc-bundled binaries. Build tools are best-effort
-# for rebuilding sqlite3 against Bionic.
+# for rebuilding sqlite3 + tree-sitter against Bionic.
 info "ensuring Termux runtime packages (nodejs-lts, ripgrep, build tools)"
 if command -v pkg >/dev/null 2>&1; then
   mkdir -p "$PREFIX/etc/apt"
@@ -296,6 +299,47 @@ info "rebuilding sqlite3 for Bionic (best effort)"
     warn "sqlite3 rebuild failed; continuing with stubs where needed"
   fi
 ) || warn "sqlite3 rebuild step failed; continuing"
+
+# --- tree-sitter rebuild (required for startup on Bionic) -------------------
+# The linux/arm64 package ships glibc tree-sitter addons. node-gyp-build
+# prefers build/Release, so those load on startup and dlopen fails on Bionic
+# (missing libgcc_s.so.1). Rebuild them with the Termux toolchain.
+
+info "rebuilding tree-sitter for Bionic"
+(
+  ng="${VERSION_DIR}/node_modules/.bin/node-gyp"
+  [ -x "$ng" ] || ng="$(command -v node-gyp || true)"
+  if [ -z "$ng" ]; then
+    warn "node-gyp missing; tree-sitter left as glibc (cursor-agent may not start)"
+    exit 0
+  fi
+  log="${HOME}/.cache/cursor-termux/tree-sitter-rebuild.log"
+  mkdir -p "$(dirname "$log")"
+  : >"$log"
+  export LD_LIBRARY_PATH="${PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+  for pkg in tree-sitter tree-sitter-bash; do
+    dir="${VERSION_DIR}/node_modules/${pkg}"
+    if [ ! -f "${dir}/binding.gyp" ]; then
+      warn "${pkg} sources missing; skipping"
+      continue
+    fi
+    backup="$(mktemp -d)"
+    if compgen -G "${dir}/build/Release/*.node" >/dev/null; then
+      cp -a "${dir}/build/Release/"*.node "$backup/" || true
+    fi
+    if (cd "$dir" && "$ng" rebuild) >>"$log" 2>&1; then
+      info "${pkg} rebuilt for Bionic"
+      rm -rf "$backup"
+    else
+      warn "${pkg} rebuild failed; see ${log}"
+      if compgen -G "${backup}/*.node" >/dev/null; then
+        mkdir -p "${dir}/build/Release"
+        cp -a "${backup}/"*.node "${dir}/build/Release/" || true
+      fi
+      rm -rf "$backup"
+    fi
+  done
+) || warn "tree-sitter rebuild step failed; continuing"
 
 # --- Merkle failure-path patch (defense in depth; preload also stubs) -------
 
@@ -679,10 +723,16 @@ chmod 755 "$LAUNCHER"
 chmod 644 "$PRELOAD_DST"
 
 # $PREFIX/bin beats ~/.local/bin so official drop / updates cannot hide us.
+# Do not claim `agent` — install-grok-termux.sh owns $PREFIX/bin/agent.
 ln -sfn "$LAUNCHER" "$BIN_DIR/cursor-agent"
-ln -sfn "$LAUNCHER" "$BIN_DIR/agent"
 ln -sfn "$LAUNCHER" "$LOCAL_BIN/cursor-agent"
-ln -sfn "$LAUNCHER" "$LOCAL_BIN/agent"
+# Drop stale agent→cursor symlinks from older installer runs.
+if [ -L "$BIN_DIR/agent" ] && [ "$(readlink "$BIN_DIR/agent" 2>/dev/null || true)" = "$LAUNCHER" ]; then
+  rm -f "$BIN_DIR/agent"
+fi
+if [ -L "$LOCAL_BIN/agent" ] && [ "$(readlink "$LOCAL_BIN/agent" 2>/dev/null || true)" = "$LAUNCHER" ]; then
+  rm -f "$LOCAL_BIN/agent"
+fi
 
 # --- PATH -------------------------------------------------------------------
 
@@ -699,28 +749,28 @@ install_rc_block() {
   case "$user_shell" in
     fish)
       new_block='# >>> cursor-agent termux >>>
-fish_add_path $HOME/.local/bin
+# Append so $PREFIX/bin/agent (Grok) stays the `agent` command.
+fish_add_path --append $HOME/.local/bin
 set -gx LD_LIBRARY_PATH "$PREFIX/lib" $LD_LIBRARY_PATH
 set -gx TMPDIR "$HOME/tmp"
-alias agent cursor-agent
 # <<< cursor-agent termux <<<'
       ;;
     zsh)
       new_block='# >>> cursor-agent termux >>>
 # $PREFIX/bin/cursor-agent is the Termux launcher.
-export PATH="$HOME/.local/bin:$PATH"
+# Append so $PREFIX/bin/agent (Grok) stays the `agent` command.
+export PATH="$PATH:$HOME/.local/bin"
 export LD_LIBRARY_PATH="$PREFIX/lib:${LD_LIBRARY_PATH:-}"
 export TMPDIR="${TMPDIR:-$HOME/tmp}"
-alias agent=cursor-agent
 # <<< cursor-agent termux <<<'
       ;;
     *)
       new_block='# >>> cursor-agent termux >>>
 # $PREFIX/bin/cursor-agent is the Termux launcher.
-export PATH="$HOME/.local/bin:$PATH"
+# Append so $PREFIX/bin/agent (Grok) stays the `agent` command.
+export PATH="$PATH:$HOME/.local/bin"
 export LD_LIBRARY_PATH="$PREFIX/lib:${LD_LIBRARY_PATH:-}"
 export TMPDIR="${TMPDIR:-$HOME/tmp}"
-alias agent=cursor-agent
 # <<< cursor-agent termux <<<'
       ;;
   esac

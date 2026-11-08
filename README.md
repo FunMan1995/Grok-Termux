@@ -5,7 +5,7 @@ Unofficial installers for AI agent CLIs on **Termux** (Android ARM64), without p
 | CLI | Installer | What it fixes |
 |-----|-----------|----------------|
 | **Grok Build** (xAI) | [`install-grok-termux.sh`](./install-grok-termux.sh) | Static musl binary + DNS path patch |
-| **Cursor Agent** | [`install-cursor-termux.sh`](./install-cursor-termux.sh) | Official linux/arm64 package + Bionic shims |
+| **Cursor Agent** | [`install-cursor-termux.sh`](./install-cursor-termux.sh) | Official linux/arm64 package + Bionic shims (sqlite3 + tree-sitter rebuild) |
 
 ## Quick start
 
@@ -42,7 +42,7 @@ grok login     # or: export XAI_API_KEY=...
 
 ## Cursor Agent
 
-Official Cursor Agent is a glibc Node bundle. Termux is Bionic, so this installer swaps in Termux `node` / `rg`, installs a preload (glibc spoof + native stubs), and drops a durable launcher.
+Official Cursor Agent is a glibc Node bundle. Termux is Bionic, so this installer swaps in Termux `node` / `rg`, rebuilds sqlite3 + tree-sitter for Bionic, installs a preload (glibc spoof + native stubs), and drops a durable `cursor-agent` launcher.
 
 ```bash
 bash install-cursor-termux.sh
@@ -59,7 +59,7 @@ cursor-agent status
 cd ~/your-project && cursor-agent
 ```
 
-`agent` is aliased to `cursor-agent`.
+Use `cursor-agent` (not `agent`) — `agent` is reserved for Grok Build when both are installed.
 
 After `cursor-agent update`, **re-run the installer** so Termux patches and the node/rg symlinks are restored.
 
