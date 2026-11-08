@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# install-grok-termux.sh — native Termux installer for xAI Grok Build.
+# install-grok-termux.sh — Termux AI Installers: native xAI Grok Build.
 #
 # The official linux-aarch64 (and linux-x86_64) artifact is a static musl
 # binary, so it runs on Android without proot. What official install.sh does

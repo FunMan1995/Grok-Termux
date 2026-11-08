@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# install-cursor-termux.sh — Termux installer for the official Cursor Agent CLI.
+# install-cursor-termux.sh — Termux AI Installers: official Cursor Agent CLI.
 #
 # Official Cursor Agent ships a linux/arm64 glibc Node bundle. Termux is Bionic,
 # so the stock binary (bundled node, ripgrep, native .node addons) does not run.

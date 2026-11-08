@@ -1,18 +1,36 @@
-# Grok-Termux
+# Termux AI Installers
 
-Run AI agent CLIs directly on Termux (Android ARM64), without proot.
+Unofficial installers for AI agent CLIs on **Termux** (Android ARM64), without proot.
 
-| CLI | Installer | Notes |
-|-----|-----------|--------|
-| **Grok** (xAI) | [`install-grok-termux.sh`](./install-grok-termux.sh) | Static musl binary + DNS path patch |
-| **Cursor Agent** | [`install-cursor-termux.sh`](./install-cursor-termux.sh) | Official linux/arm64 package + Bionic compatibility |
+| CLI | Installer | What it fixes |
+|-----|-----------|----------------|
+| **Grok Build** (xAI) | [`install-grok-termux.sh`](./install-grok-termux.sh) | Static musl binary + DNS path patch |
+| **Cursor Agent** | [`install-cursor-termux.sh`](./install-cursor-termux.sh) | Official linux/arm64 package + Bionic shims |
 
-## Grok
+## Quick start
 
 ```bash
-bash /sdcard/Download/install-grok-termux.sh           # latest stable
-bash /sdcard/Download/install-grok-termux.sh 1.0.3     # pin a version
-GROK_CHANNEL=alpha bash .../install-grok-termux.sh
+# Interactive picker
+bash install.sh
+
+# Or install one directly
+bash install.sh grok
+bash install.sh cursor
+```
+
+Pin a build when you want a known-good version:
+
+```bash
+bash install.sh grok 1.0.3
+bash install.sh cursor 2026.11.05-86047df
+```
+
+## Grok Build
+
+```bash
+bash install-grok-termux.sh           # latest stable
+bash install-grok-termux.sh 1.0.3     # pin a version
+GROK_CHANNEL=alpha bash install-grok-termux.sh
 ```
 
 Then:
@@ -27,9 +45,9 @@ grok login     # or: export XAI_API_KEY=...
 Official Cursor Agent is a glibc Node bundle. Termux is Bionic, so this installer swaps in Termux `node` / `rg`, installs a preload (glibc spoof + native stubs), and drops a durable launcher.
 
 ```bash
-bash /sdcard/Download/install-cursor-termux.sh
-# or pin:
-bash /sdcard/Download/install-cursor-termux.sh 2026.11.05-86047df
+bash install-cursor-termux.sh
+# or pin a build:
+bash install-cursor-termux.sh 2026.11.05-86047df
 ```
 
 Then:
@@ -51,6 +69,10 @@ After `cursor-agent update`, **re-run the installer** so Termux patches and the 
 - Termux (F-Droid recommended)
 - Cursor account / subscription (login; no BYO API key required)
 
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs a **build** job that syntax-checks every installer (`bash -n`), runs ShellCheck (advisory), and smokes `--help` / `--list`.
+
 ## Disclaimer
 
-These installers are unofficial community scripts. Grok and Cursor Agent are proprietary. Expect breakage when upstream bundles change.
+These installers are unofficial community scripts. Grok Build and Cursor Agent are proprietary. Expect breakage when upstream bundles change. Not affiliated with xAI or Anysphere / Cursor.
