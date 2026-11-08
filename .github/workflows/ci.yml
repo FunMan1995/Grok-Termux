@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Validate installers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Bash syntax check
+        run: |
+          set -euo pipefail
+          for f in install.sh install-grok-termux.sh install-cursor-termux.sh; do
+            echo "== bash -n $f =="
+            bash -n "$f"
+          done
+
+      - name: ShellCheck (non-fatal style)
+        run: |
+          set -euo pipefail
+          # Installers are Termux-oriented and intentionally use Termux paths /
+          # dynamic constructs; keep ShellCheck advisory so CI still gates on
+          # bash -n correctness.
+          shellcheck -x -s bash \
+            -e SC2016,SC2086,SC2164,SC1091,SC2155,SC2001,SC2181 \
+            install.sh \
+            install-grok-termux.sh \
+            install-cursor-termux.sh \
+            || echo "::warning::ShellCheck reported issues (advisory)"
+
+      - name: Help smoke
+        run: |
+          set -euo pipefail
+          bash install.sh --help >/dev/null
+          bash install.sh --list >/dev/null
+          bash install-grok-termux.sh --help >/dev/null
+          bash install-cursor-termux.sh --help >/dev/null
+          echo "help smoke OK"
